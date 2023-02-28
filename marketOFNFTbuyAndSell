@@ -1,0 +1,92 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.4;
+
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+contract MarketForNft is ReentrancyGuard{
+    address payable public owner;
+    uint public profit; 
+    uint public itemCount;
+    // to show status of NFT
+    enum nftSaleStatus{Active,sold}
+    
+
+    constructor(uint _profit){
+        owner = payable (msg.sender);
+        profit = _profit;}
+        
+        // this is info about NFT
+        struct nftlist {
+            uint nftId;
+            IERC721 nft;
+            uint tokenId;
+            uint price;
+            nftSaleStatus status;
+            address payable seller;
+        }
+
+        event nfthasListed(
+            uint tokenId , uint itemId , uint price, address seller
+        );
+
+        event nfthasBought(uint _tokenId, nftSaleStatus _status);
+        // mapping to list all NFT info with a no.
+        mapping(uint => nftlist) public nftlists;
+
+
+        // function to list a token
+        function listToken(IERC721 _nft , uint _tokenId , uint _price ) external nonReentrant{
+            require(_price>0  , "Price should be greater then Zero.");
+            itemCount++;
+            _nft.transferFrom(msg.sender, address(this), _tokenId);
+            nftlists[itemCount] = nftlist(
+                itemCount,_nft,_tokenId,_price,nftSaleStatus.Active,payable (msg.sender)
+            );
+            
+            emit nfthasListed(_tokenId,itemCount,_price, msg.sender);
+
+        }
+        
+
+        // function for total price including profit
+        function TotalPayablePrice(uint _itemCount) view public returns(uint){
+            return(nftlists[_itemCount].price + profit);
+        }
+
+
+        // funtion to buy token
+        function buyToken(uint _itemCount) external payable nonReentrant{
+            
+            // here we call TotalPayableprice funtion to give total payable price of the token
+            uint TotalPrice = TotalPayablePrice(_itemCount);
+
+            require(_itemCount > 0, "Enter a valid Id");
+
+            // this require condition which insure that owner can't buy their own token
+            require(msg.sender != owner , "Owner can't buy the token");
+
+            // here we point our token info as per item id
+            nftlist storage _nftlists = nftlists[_itemCount];
+
+            // this function insure that person can't pay less amount
+            require(msg.value >= TotalPrice , "You can't pay less than payable ammount.");
+
+            // this function insure that NFT is listed and in Active condition
+            require ((_nftlists.status) == nftSaleStatus.Active , "This token may be sold or not listed");
+
+            _nftlists.seller.transfer(_nftlists.price);
+            owner.transfer(TotalPrice - _nftlists.price);
+
+            _nftlists.nft.transferFrom(address(this),msg.sender,_nftlists.tokenId);
+            
+            _nftlists.status = nftSaleStatus.sold;
+
+
+            emit nfthasBought (_nftlists.tokenId,_nftlists.status);
+
+        }
+
+    
+
+}
