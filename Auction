@@ -1,0 +1,102 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.8;
+
+contract auction{
+   
+    mapping ( address => uint) bidders;
+    // this variable stores minimum bid
+    uint public minBid;
+    // this variable stores highest bid
+    uint public highestBid;
+    // address of contract owner
+    address public owner;
+    
+    uint public startTime ;
+    
+    uint public endTime;
+    // deadline in seconds
+    uint public deadline;
+    // description about contract
+    string public description;
+
+    address public highestbidder;
+    
+
+    constructor(uint _deadline,string memory _description , uint _minBid ){
+        deadline = _deadline;
+        description =_description;
+        highestBid = 0 ether;
+        minBid = _minBid;
+        owner = msg.sender;
+        startTime = block.timestamp;
+        endTime =startTime +_deadline;
+       
+    }
+//  modifier which enable only owner
+    modifier onlyOwner(){
+        require(msg.sender == owner , "Only owner can see this info.");
+        _;
+    }
+
+    modifier notOwner(){
+        require(msg.sender != owner , "Owner can't bid");
+        _;
+    }
+
+    modifier AuctionIsRunning(){
+        require(block.timestamp < endTime , "This auction is over.");
+        _;
+    }
+
+    modifier AuctionIsOver(){
+        require(block.timestamp > endTime , "This auction is still running.");
+        _;
+    }
+ 
+
+// function to putbid
+    function putbid() public payable AuctionIsRunning notOwner {
+        
+        require (msg.value > minBid,"Bid Higher");
+        require ((msg.value - highestBid) >= 1 ether , "You need to bid atleast one ether higher then the last bid." );
+        uint totalBidByOne = bidders[msg.sender] + msg.value;
+        bidders[msg.sender] = totalBidByOne;
+        highestBid = bidders[msg.sender];
+        highestbidder = msg.sender;
+
+    }
+
+// function to view contract balance
+
+    function getContractBalance() public view  onlyOwner returns (uint){
+        return address(this).balance;
+    }
+
+    function getbiddersBid(address _address) public view returns (uint){
+        return bidders[_address];
+    }
+// function to find winner 
+    function findWinner() view public AuctionIsOver returns(address){
+        
+        return highestbidder;
+
+    }
+// function to refund money of bidder except winner
+    function refund() AuctionIsOver public{
+        
+        require(msg.sender != highestbidder ,"You are winner.");
+        require(bidders[msg.sender]>0);
+        address payable user = payable(msg.sender);
+        user.transfer(bidders[msg.sender]);
+        bidders[msg.sender]=0;
+        
+    }
+
+// this function is to transfer highest bid to Auction owner
+    function tranferWinningBid() onlyOwner AuctionIsOver public{
+        address payable user = payable(owner);
+        user.transfer(highestBid);
+    }
+  
+    
+}
