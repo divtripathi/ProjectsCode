@@ -1,0 +1,76 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.8;
+
+contract CreateAuction{
+    struct auctionDetails{
+        uint id;
+        string description;
+        address owner;
+        uint minBid;
+        // in Seconds only
+        uint deadline;
+        uint startTime;
+        uint endTime ;
+        uint highestBid;
+        
+    }
+    mapping (uint => auctionDetails) public auction;
+
+    uint public id;
+
+    mapping (uint => mapping(address=>uint)) public bidders;
+
+    mapping (uint => address) public highestbidder;
+
+    constructor() {
+        id = 0;
+    }
+
+    
+
+    function LaunchAuction(string memory _description , uint _minBid , uint _deadline ) external {
+        auction[id] = auctionDetails(id,_description , msg.sender , _minBid , _deadline , block.timestamp , block.timestamp + _deadline,0);
+        id++;
+    }
+
+        function putbid(uint _id ) external payable {
+            require(auction[_id].endTime >= block.timestamp,"Auction is over");
+            require (msg.value > auction[_id].minBid, "Bid Higher");
+            require ((msg.value - auction[_id].highestBid) >= 1 ether , "You need to bid atleast one ether higher then the last bid." );
+            require ((msg.sender != auction[_id].owner) , "owner can't bid." );
+            uint totalBidByOne = bidders[_id][msg.sender] + msg.value;
+            bidders[_id][msg.sender] = totalBidByOne;
+            auction[_id].highestBid = bidders[_id][msg.sender];
+            highestbidder[_id] = msg.sender;
+
+    }
+
+        function findWinner(uint _id) view public returns(address){
+
+            require(auction[_id].endTime < block.timestamp,"This auction is still running");
+            require(msg.sender == auction[_id].owner , "Only owner can run this function" );
+
+            return highestbidder[_id];
+
+    }
+
+        function refund(uint _id)  public {
+            require(auction[_id].endTime < block.timestamp,"This auction is still running");
+            require(msg.sender != highestbidder[_id] ,"You are winner.");
+            require(bidders[_id][msg.sender]>0);
+            address payable user = payable(msg.sender);
+            user.transfer(bidders[_id][msg.sender]);
+            bidders[_id][msg.sender]=0;
+        
+    }
+
+        function tranferWinningBid(uint _id) public{
+            require(auction[_id].endTime < block.timestamp,"This auction is still running");
+            require(msg.sender == auction[_id].owner , "Only owner can run this function" );
+            address payable user = payable(auction[_id].owner);
+            user.transfer(auction[_id].highestBid);
+    }
+
+    
+
+}
